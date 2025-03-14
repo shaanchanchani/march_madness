@@ -582,9 +582,12 @@ def process_final_dataframe(final_df):
     final_df['theoddsapi_total'] = final_df['Projected Total']
     
     # Calculate median of spreads across all models
-    spread_models = ['spread_barttorvik', 'spread_kenpom', 'spread_evanmiya']
-    final_df['Predicted Outcome'] = final_df[spread_models].median(axis=1)
-    # Load spreads lookup data
+    spread_models = ['spread_barttorvik', 'spread_kenpom', 'spread_evanmiya', 'spread_hasla']
+    final_df['forecasted_spread'] = final_df[spread_models].median(axis=1)
+
+    final_df['Predicted Outcome'] = (0.7 * final_df['Opening Spread'] +
+                                    0.3 * final_df['forecasted_spread'])
+        # Load spreads lookup data
     try:
         spreads_lookup_path = os.path.join(data_dir, 'spreads_lookup.csv')
         logger.info(f"[cyan]Loading spreads lookup data from {spreads_lookup_path}[/cyan]")
