@@ -572,6 +572,171 @@ def merge_with_combined_data(odds_df):
     
     return result_df
 
+def process_final_dataframe(final_df):
+    """
+    Process the final dataframe with spreads and totals lookup tables.
+    Apply the requested calculations and return a formatted dataframe.
+    """
+    logger.info("[cyan]Processing final dataframe with lookup tables...[/cyan]")
+    # Set theoddsapi_total for the lookups
+    final_df['theoddsapi_total'] = final_df['Projected Total']
+    
+    # Calculate Predicted Outcome based on spread data
+    # Predicted Outcome is the negative of the spread value (spread shows disadvantage)
+    # If spread_barttorvik exists, use it as primary source, otherwise use other models in order
+    if 'spread_barttorvik' in final_df.columns:
+        final_df['Predicted Outcome'] = -final_df['spread_barttorvik']
+    elif 'spread_kenpom' in final_df.columns:
+        final_df['Predicted Outcome'] = -final_df['spread_kenpom']
+    elif 'spread_evanmiya' in final_df.columns:
+        final_df['Predicted Outcome'] = -final_df['spread_evanmiya']
+    elif 'spread_hasla' in final_df.columns:
+        final_df['Predicted Outcome'] = -final_df['spread_hasla']
+    else:
+        # If no spread columns exist, initialize with zeros
+        final_df['Predicted Outcome'] = 0
+    
+    # Load spreads lookup data
+    try:
+        spreads_lookup_path = os.path.join(data_dir, 'spreads_lookup.csv')
+        logger.info(f"[cyan]Loading spreads lookup data from {spreads_lookup_path}[/cyan]")
+        lookup_df = pd.read_csv(spreads_lookup_path)
+        
+        # Round predicted outcome for matching and handle NaN values
+        final_df['Predicted Outcome'] = final_df['Predicted Outcome'].fillna(0).round()
+        final_df['Predicted Outcome'] = final_df['Predicted Outcome'].astype(int)
+
+        # Calculate spread implied probability from Spread Price
+        if 'Spread Price' in final_df.columns:
+            final_df['spread_implied_prob'] = final_df['Spread Price'].apply(american_odds_to_implied_probability)
+        else:
+            # If Spread Price doesn't exist, initialize with 0.5 (50% probability)
+            final_df['spread_implied_prob'] = 0.5
+
+        # Merge with lookup data
+        final_df = final_df.merge(
+            lookup_df,
+            left_on=['Opening Spread', 'Predicted Outcome'],
+            right_on=['spread', 'result'],
+            how='left'
+        )
+        # Calculate cover probability and edge
+        final_df['Spread Cover Probability'] = final_df['cover_prob']
+        final_df['Edge For Covering Spread'] = (
+            final_df['Spread Cover Probability'] -
+            final_df['spread_implied_prob']
+        )
+        logger.info(f"[green]✓[/green] Successfully applied spreads lookup")
+    except FileNotFoundError:
+        logger.warning("[yellow]⚠[/yellow] spreads_lookup.csv not found")
+        final_df['Spread Cover Probability'] = np.nan
+        final_df['Edge For Covering Spread'] = np.nan
+    
+    # Calculate totals projections
+    projected_total_models = ['projected_total_barttorvik',
+                            'projected_total_kenpom', 
+                            'projected_total_evanmiya',
+                            'projected_total_hasla']
+
+    # Handle missing totals data
+    final_df['theoddsapi_total'] = pd.to_numeric(final_df['theoddsapi_total'], errors='coerce')
+    final_df['forecasted_total'] = final_df[projected_total_models].median(axis=1, skipna=True)
+
+    # Add totals standard deviation here
+    final_df['Totals Std. Dev.'] = final_df[projected_total_models].std(axis=1, skipna=True).round(1)
+
+    # Fill missing averages with theoddsapi_total and round to integer
+    final_df['average_total'] = (
+        (0.55 * final_df['theoddsapi_total'].fillna(0) +
+        0.45 * final_df['forecasted_total'].fillna(final_df['theoddsapi_total']))
+    ).round().astype(pd.Int64Dtype())
+    
+    # Load and process totals lookup data
+    try:
+        totals_lookup_path = os.path.join(data_dir, 'totals_lookup.csv')
+        logger.info(f"[cyan]Loading totals lookup data from {totals_lookup_path}[/cyan]")
+        totals_lookup_df = pd.read_csv(totals_lookup_path)
+
+        # Convert lookup table columns to correct types
+        totals_lookup_df['Market Line'] = totals_lookup_df['Market Line'].astype(float)
+        totals_lookup_df['True Line'] = totals_lookup_df['True Line'].astype(pd.Int64Dtype())
+
+        # Drop any duplicate rows before merging
+        final_df = final_df.drop_duplicates(subset=['Game', 'Team'], keep='first')
+
+        # Use theoddsapi_total directly since it's already rounded to 0.5
+        final_df = final_df.merge(
+            totals_lookup_df,
+            left_on=['theoddsapi_total', 'average_total'],
+            right_on=['Market Line', 'True Line'],
+            how='left'
+        )
+        final_df['Over Cover Probability'] = final_df['Over_Probability']
+        final_df['Under Cover Probability'] = final_df['Under_Probability']
+        final_df.drop(columns=['theoddsapi_total_rounded',
+                            'Market Line', 'True Line', 'Over_Probability',
+                            'Under_Probability', 'Push_Probability'], inplace=True, errors='ignore')
+        logger.info(f"[green]✓[/green] Successfully applied totals lookup")
+    except FileNotFoundError:
+        logger.warning("[yellow]⚠[/yellow] totals_lookup.csv not found. Skipping Over/Under probabilities.")
+        final_df['Over Cover Probability'] = np.nan
+        final_df['Under Cover Probability'] = np.nan
+
+    # Calculate totals implied probabilities and edges
+    final_df['over_implied_prob'] = final_df['Over Price'].apply(american_odds_to_implied_probability)
+    final_df['under_implied_prob'] = final_df['Under Price'].apply(american_odds_to_implied_probability)
+    final_df['Over Total Edge'] = final_df['Over Cover Probability'] - final_df['over_implied_prob']
+    final_df['Under Total Edge'] = final_df['Under Cover Probability'] - final_df['under_implied_prob']
+
+    # Calculate spread standard deviation
+    spread_models = ['spread_barttorvik', 'spread_kenpom', 'spread_evanmiya', 'spread_hasla']
+    final_df['Spread Std. Dev.'] = final_df[spread_models].std(axis=1, skipna=True).round(1)
+    
+    # Calculate totals standard deviation
+    projected_total_models = ['projected_total_barttorvik', 'projected_total_kenpom', 
+                             'projected_total_evanmiya', 'projected_total_hasla']
+    final_df['Totals Std. Dev.'] = final_df[projected_total_models].std(axis=1, skipna=True).round(1)
+    
+    # Calculate moneyline standard deviation
+    win_prob_models = ['win_prob_barttorvik', 'win_prob_kenpom', 'win_prob_evanmiya']
+    final_df['Moneyline Std. Dev.'] = final_df[win_prob_models].std(axis=1, skipna=True).round(3)
+
+    # Calculate Moneyline Win Probability as the average of the models
+    final_df['Moneyline Win Probability'] = final_df[win_prob_models].mean(axis=1, skipna=True).round(3)
+    
+    # Calculate Moneyline Edge
+    final_df['Moneyline Edge'] = final_df['Moneyline Win Probability'] - final_df['Devigged Probability']
+
+    # Keep rows with missing devigged probabilities, just fill with 0
+    final_df['Devigged Probability'] = final_df['Devigged Probability'].fillna(0)
+    final_df['Moneyline Edge'] = final_df['Moneyline Edge'].fillna(0)
+
+    # Drop any remaining duplicates after all processing
+    final_df = final_df.drop_duplicates(subset=['Game', 'Team'], keep='first')
+
+    logger.info(f"[cyan]Final shape after handling missing devigged probabilities:[/cyan] {final_df.shape}")
+
+    final_df = final_df.sort_values('Game Time', ascending=True)
+    
+    # Define final column order
+    column_order = [
+        'Game', 'Game Time', 'Team', 'Predicted Outcome', 'Spread Cover Probability',
+        'Opening Spread', 'Edge For Covering Spread', 'Spread Std. Dev.', 'spread_barttorvik', 
+        'spread_kenpom', 'spread_evanmiya', 'spread_hasla',
+        'Moneyline Win Probability', 'Opening Moneyline', 'Devigged Probability', 'Moneyline Edge', 'Moneyline Std. Dev.',
+        'win_prob_barttorvik', 'win_prob_kenpom', 'win_prob_evanmiya',
+        'average_total', 'theoddsapi_total', 'Totals Std. Dev.', 'projected_total_barttorvik',
+        'projected_total_kenpom', 'projected_total_evanmiya', 'projected_total_hasla',
+        'Over Cover Probability', 'Under Cover Probability',
+        'Over Total Edge', 'Under Total Edge'
+    ]
+    
+    # Only keep columns that exist in the dataframe
+    available_columns = [col for col in column_order if col in final_df.columns]
+    
+    logger.info(f"[green]✓[/green] Final dataframe processing complete")
+    return final_df[available_columns].reset_index(drop=True)
+
 def run_oddsapi_etl():
     """
     Main ETL function to run the OddsAPI workflow
@@ -600,6 +765,9 @@ def run_oddsapi_etl():
     if final_df.empty:
         logger.error("[red]✗[/red] Failed to merge odds data with combined data")
         return pd.DataFrame()
+    
+    # Process final dataframe with lookup tables
+    final_df = process_final_dataframe(final_df)
     
     # Save final results
     output_path = os.path.join(data_dir, 'final_combined_data.csv')

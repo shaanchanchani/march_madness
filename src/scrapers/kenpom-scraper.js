@@ -125,7 +125,11 @@ async function runScraper() {
   try {
     console.log('Starting to scrape FanMatch data...');
     
-
+    // Create a page
+    const page = await context.newPage();
+    
+    // Define cookies path
+    const cookiesPath = path.join(CONFIG.outputDir, 'cookies.json');
     
     /**
      * Handles the login process
@@ -199,7 +203,7 @@ async function runScraper() {
             console.log('Saved cookies to file');
             
             // Navigate to FanMatch with more reliable DOM loading
-            await navigateToFanMatch();
+            await navigateToFanMatch(page);
             
             return true; // Login successful
           } else {
@@ -224,9 +228,10 @@ async function runScraper() {
     
     /**
      * Navigates to the FanMatch page
+     * @param {Object} page - Playwright Page object
      * @returns {Promise<boolean>} - True if navigation was successful
      */
-    const navigateToFanMatch = async () => {
+    const navigateToFanMatch = async (page) => {
       console.log('Navigating to FanMatch page...');
       
       // Use more reliable loading condition
@@ -264,8 +269,23 @@ async function runScraper() {
         return false;
       }
     };
-
     
+    // Try to access FanMatch page
+    let accessSuccessful = false;
+    
+    // First try direct navigation
+    accessSuccessful = await navigateToFanMatch(page);
+    
+    // If direct navigation fails, try login
+    if (!accessSuccessful) {
+      const loginSuccessful = await handleLogin();
+      if (loginSuccessful) {
+        accessSuccessful = true;
+      } else {
+        accessSuccessful = false;
+      }
+    }
+
     if (!accessSuccessful) {
       throw new Error('Could not access FanMatch page after multiple attempts');
     }
@@ -662,4 +682,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { runScraper }; 
+module.exports = { runScraper };
