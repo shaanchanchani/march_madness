@@ -6,6 +6,9 @@ on:
     - cron: '*/5 * * * *'
   workflow_dispatch:  # Allow manual triggering
 
+permissions:
+  contents: write
+
 jobs:
   scrape:
     runs-on: ubuntu-latest
@@ -59,4 +62,3 @@ jobs:
             git commit -m "Update CBB_Output.csv - $(date -u +"%Y-%m-%d %H:%M:%S UTC")"
             git push -f origin HEAD:${GITHUB_REF}
           fi
-        
