@@ -585,8 +585,8 @@ def process_final_dataframe(final_df):
     spread_models = ['spread_barttorvik', 'spread_kenpom', 'spread_evanmiya', 'spread_hasla']
     final_df['forecasted_spread'] = final_df[spread_models].median(axis=1)
 
-    final_df['Predicted Outcome'] = (0.7 * final_df['Opening Spread'] +
-                                    0.3 * final_df['forecasted_spread'])
+    final_df['Predicted Outcome'] = (0.6 * final_df['Opening Spread'] +
+                                    0.4 * final_df['forecasted_spread'])
         # Load spreads lookup data
     try:
         spreads_lookup_path = os.path.join(data_dir, 'spreads_lookup.csv')
