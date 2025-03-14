@@ -230,7 +230,7 @@ def scrape_hasla():
             spread = None
             if teamA_score and teamB_score:
                 try:
-                    spread = float(teamA_score) - float(teamB_score)
+                    spread = float(teamB_score) - float(teamA_score)
                     spread = round(spread, 1)
                 except ValueError:
                     spread = None
