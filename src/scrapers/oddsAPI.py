@@ -581,21 +581,9 @@ def process_final_dataframe(final_df):
     # Set theoddsapi_total for the lookups
     final_df['theoddsapi_total'] = final_df['Projected Total']
     
-    # Calculate Predicted Outcome based on spread data
-    # Predicted Outcome is the negative of the spread value (spread shows disadvantage)
-    # If spread_barttorvik exists, use it as primary source, otherwise use other models in order
-    if 'spread_barttorvik' in final_df.columns:
-        final_df['Predicted Outcome'] = -final_df['spread_barttorvik']
-    elif 'spread_kenpom' in final_df.columns:
-        final_df['Predicted Outcome'] = -final_df['spread_kenpom']
-    elif 'spread_evanmiya' in final_df.columns:
-        final_df['Predicted Outcome'] = -final_df['spread_evanmiya']
-    elif 'spread_hasla' in final_df.columns:
-        final_df['Predicted Outcome'] = -final_df['spread_hasla']
-    else:
-        # If no spread columns exist, initialize with zeros
-        final_df['Predicted Outcome'] = 0
-    
+    # Calculate median of spreads across all models
+    spread_models = ['spread_barttorvik', 'spread_kenpom', 'spread_evanmiya']
+    final_df['Predicted Outcome'] = final_df[spread_models].median(axis=1)
     # Load spreads lookup data
     try:
         spreads_lookup_path = os.path.join(data_dir, 'spreads_lookup.csv')
