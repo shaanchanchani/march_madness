@@ -705,8 +705,10 @@ def process_final_dataframe(final_df):
     win_prob_models = ['win_prob_barttorvik', 'win_prob_kenpom', 'win_prob_evanmiya']
     final_df['Moneyline Std. Dev.'] = final_df[win_prob_models].std(axis=1, skipna=True).round(3)
 
-    # Calculate Moneyline Win Probability as the average of the models
-    final_df['Moneyline Win Probability'] = final_df[win_prob_models].mean(axis=1, skipna=True).round(3)
+    # Calculate moneyline probabilities and edge using devigged probabilities
+    win_prob_cols = ['win_prob_barttorvik', 'win_prob_kenpom', 'win_prob_evanmiya']
+    final_df['Moneyline Win Probability'] = final_df[win_prob_cols].median(axis=1, skipna=True)
+    final_df['Moneyline Win Probability'] = (0.5 * final_df['Moneyline Win Probability'] + 0.5 * final_df['Devigged Probability'])
     
     # Calculate Moneyline Edge
     final_df['Moneyline Edge'] = final_df['Moneyline Win Probability'] - final_df['Devigged Probability']
