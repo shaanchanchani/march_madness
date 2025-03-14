@@ -147,7 +147,9 @@ async function joinDatasets() {
     // Use Map instead of plain objects for better performance with larger datasets
     const emLookup = new Map();
     emData.forEach(item => {
-      emLookup.set(item['Team'], item);
+      // Use composite key with Team, Home Team, and Away Team (no fallback)
+      const key = `${item['Team']}_${item['Home Team']}_${item['Away Team']}`;
+      emLookup.set(key, item);
     });
     
     // Create Barttorvik lookup with team as key
@@ -180,7 +182,9 @@ async function joinDatasets() {
     const innerJoinResult = [];
     
     for (const kpItem of kpData) {
-      const emItem = emLookup.get(kpItem['Team']);
+      // Create the same composite key for matching
+      const compositeKey = `${kpItem['Team']}_${kpItem['Home Team']}_${kpItem['Away Team']}`;
+      const emItem = emLookup.get(compositeKey);
       
       if (emItem) {
         // Start with KenPom data
