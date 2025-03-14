@@ -50,7 +50,7 @@ async function transformEvanMiyaData() {
           'Away Team': awayTeam,
           'Team': homeTeam,
           'Game Date': gameDate,
-          'spread_evanmiya': parseFloat(row.line),
+          'spread_evanmiya': -parseFloat(row.line), // Flip the sign for home team
           'win_prob_evanmiya': parseFloat(row.home_win_prob),
           'projected_total_evanmiya': parseFloat(row.ou)
         };
@@ -62,7 +62,7 @@ async function transformEvanMiyaData() {
           'Away Team': awayTeam,
           'Team': awayTeam,
           'Game Date': gameDate,
-          'spread_evanmiya': -parseFloat(row.line), // Flip the sign for away team
+          'spread_evanmiya': parseFloat(row.line), // Use line value directly
           'win_prob_evanmiya': parseFloat(row.away_win_prob),
           'projected_total_evanmiya': parseFloat(row.ou)
         };

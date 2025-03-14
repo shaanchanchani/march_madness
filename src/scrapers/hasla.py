@@ -378,6 +378,14 @@ if __name__ == "__main__":
     print("\n[cyan]Mapping team names...[/cyan]")
     mapped_df = map_team_names(df)
     
+    # Sort the DataFrame by Game Date
+    print("\n[cyan]Sorting DataFrame by Game Date...[/cyan]")
+    mapped_df['Game Date'] = pd.to_datetime(mapped_df['Game Date'], format='%Y%m%d')
+    mapped_df = mapped_df.sort_values(by='Game Date')
+    # Convert back to string format for consistency
+    mapped_df['Game Date'] = mapped_df['Game Date'].dt.strftime('%Y%m%d')
+    print(f"[green]✓[/green] DataFrame sorted by Game Date")
+    
     # Save output to CSV
     output_file = os.path.join(data_dir, 'hasla_mapped.csv')
     mapped_df.to_csv(output_file, index=False)
