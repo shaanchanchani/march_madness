@@ -606,6 +606,13 @@ def process_final_dataframe(final_df):
         final_df['Predicted Outcome'] = final_df['Predicted Outcome'].fillna(0).round()
         final_df['Predicted Outcome'] = final_df['Predicted Outcome'].astype(int)
 
+        # Round Opening Spread to nearest 0.5 for proper lookup matching
+        if 'Opening Spread' in final_df.columns:
+            # Round to nearest 0.5 by multiplying by 2, rounding, then dividing by 2
+            final_df['Opening Spread_Rounded'] = (final_df['Opening Spread'] * 2).round() / 2
+        else:
+            final_df['Opening Spread_Rounded'] = 0
+
         # Calculate spread implied probability from Spread Price
         if 'Spread Price' in final_df.columns:
             final_df['spread_implied_prob'] = final_df['Spread Price'].apply(american_odds_to_implied_probability)
@@ -613,10 +620,10 @@ def process_final_dataframe(final_df):
             # If Spread Price doesn't exist, initialize with 0.5 (50% probability)
             final_df['spread_implied_prob'] = 0.5
 
-        # Merge with lookup data
+        # Merge with lookup data using the rounded spread
         final_df = final_df.merge(
             lookup_df,
-            left_on=['Opening Spread', 'Predicted Outcome'],
+            left_on=['Opening Spread_Rounded', 'Predicted Outcome'],
             right_on=['spread', 'result'],
             how='left'
         )
@@ -631,6 +638,8 @@ def process_final_dataframe(final_df):
         logger.warning("[yellow]⚠[/yellow] spreads_lookup.csv not found")
         final_df['Spread Cover Probability'] = np.nan
         final_df['Edge For Covering Spread'] = np.nan
+        # Clean up temporary columns even if lookup failed
+        final_df.drop(columns=['Opening Spread_Rounded'], inplace=True, errors='ignore')
     
     # Calculate totals projections
     projected_total_models = ['projected_total_barttorvik',
@@ -640,6 +649,10 @@ def process_final_dataframe(final_df):
 
     # Handle missing totals data
     final_df['theoddsapi_total'] = pd.to_numeric(final_df['theoddsapi_total'], errors='coerce')
+    
+    # Make sure theoddsapi_total is rounded to nearest 0.5 for proper lookup
+    final_df['theoddsapi_total_rounded'] = (final_df['theoddsapi_total'] * 2).round() / 2
+    
     final_df['forecasted_total'] = final_df[projected_total_models].median(axis=1, skipna=True)
 
     # Add totals standard deviation here
@@ -667,7 +680,7 @@ def process_final_dataframe(final_df):
         # Use theoddsapi_total directly since it's already rounded to 0.5
         final_df = final_df.merge(
             totals_lookup_df,
-            left_on=['theoddsapi_total', 'average_total'],
+            left_on=['theoddsapi_total_rounded', 'average_total'],
             right_on=['Market Line', 'True Line'],
             how='left'
         )
@@ -675,12 +688,15 @@ def process_final_dataframe(final_df):
         final_df['Under Cover Probability'] = final_df['Under_Probability']
         final_df.drop(columns=['theoddsapi_total_rounded',
                             'Market Line', 'True Line', 'Over_Probability',
-                            'Under_Probability', 'Push_Probability'], inplace=True, errors='ignore')
+                            'Under_Probability', 'Push_Probability', 'Opening Spread_Rounded',
+                            'spread', 'result'], inplace=True, errors='ignore')
         logger.info(f"[green]✓[/green] Successfully applied totals lookup")
     except FileNotFoundError:
         logger.warning("[yellow]⚠[/yellow] totals_lookup.csv not found. Skipping Over/Under probabilities.")
         final_df['Over Cover Probability'] = np.nan
         final_df['Under Cover Probability'] = np.nan
+        # Clean up temporary columns even if lookup failed
+        final_df.drop(columns=['theoddsapi_total_rounded'], inplace=True, errors='ignore')
 
     # Calculate totals implied probabilities and edges
     final_df['over_implied_prob'] = final_df['Over Price'].apply(american_odds_to_implied_probability)
@@ -710,6 +726,14 @@ def process_final_dataframe(final_df):
     # Keep rows with missing devigged probabilities, just fill with 0
     final_df['Devigged Probability'] = final_df['Devigged Probability'].fillna(0)
     final_df['Moneyline Edge'] = final_df['Moneyline Edge'].fillna(0)
+
+    # Rename 'Moneyline' column to 'Opening Moneyline' if it exists
+    if 'Moneyline' in final_df.columns:
+        # Round moneyline values to the nearest integer
+        final_df['Opening Moneyline'] = final_df['Moneyline'].round().astype('Int64')
+    else:
+        logger.warning("[yellow]⚠[/yellow] 'Moneyline' column not found, creating empty 'Opening Moneyline' column")
+        final_df['Opening Moneyline'] = np.nan
 
     # Drop any remaining duplicates after all processing
     final_df = final_df.drop_duplicates(subset=['Game', 'Team'], keep='first')

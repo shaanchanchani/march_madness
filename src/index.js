@@ -284,6 +284,8 @@ async function runScrapers() {
     console.log("KenPom output: data/kp.csv");
     console.log("Barttorvik output: data/bt_mapped.csv");
     console.log("Hasla output: data/hasla_mapped.csv");
+    console.log("Spreads lookup: data/spreads_lookup.csv");
+    console.log("Totals lookup: data/totals_lookup.csv");
     
     // Run the EvanMiya scraper first
     await runScript(path.join(__dirname, 'scrapers', 'evanmiya-scraper.js'), 'EvanMiya');
@@ -324,8 +326,8 @@ async function runScrapers() {
     console.log(`- ${path.join(dataDir, 'bt_mapped.csv')}`);
     console.log(`- ${path.join(dataDir, 'hasla_mapped.csv')}`);
     console.log(`- ${path.join(dataDir, 'combined_data.csv')}`);
-    console.log(`- ${path.join(dataDir, 'final_combined_data.csv')}`);
-    console.log(`- ${'CBB Output.csv'}`);
+    console.log(`- ${path.join(dataDir, 'final_combined_data.csv')} (includes spread/total probabilities from lookup tables)`);
+    console.log(`- ${'CBB_Output.csv'}`);
     
   } catch (error) {
     console.error("=== Error running scrapers or transformers ===");
