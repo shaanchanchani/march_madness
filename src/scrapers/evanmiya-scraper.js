@@ -9,6 +9,7 @@ const { chromium } = require('@playwright/test');
 require('dotenv').config();
 const path = require('path');
 const fs = require('fs');
+const csv = require('csv-parser');
 
 // Configuration for the scraper
 const config = {
@@ -37,6 +38,82 @@ function ensureDirectoryExists(dirPath) {
  */
 async function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Process the downloaded CSV file to fix spread directions
+ * @param {string} filePath - Path to the downloaded CSV
+ * @returns {Promise<void>}
+ */
+async function processSpreadDirections(filePath) {
+  return new Promise((resolve, reject) => {
+    if (!fs.existsSync(filePath)) {
+      return reject(new Error(`File not found: ${filePath}`));
+    }
+
+    const results = [];
+    fs.createReadStream(filePath)
+      .pipe(csv())
+      .on('data', (data) => results.push(data))
+      .on('end', () => {
+        if (results.length === 0) {
+          console.log('No data found in CSV file');
+          return resolve();
+        }
+        
+        // Log all column names first to help identify which ones need correction
+        const allColumns = Object.keys(results[0]);
+        console.log('All columns in CSV:', allColumns.join(', '));
+        
+        // Specifically target the line column as requested (EvanMiya's predicted spread)
+        const columnsToInvert = ['line'];
+        
+        // Check if the column exists in the data
+        if (!allColumns.includes('line')) {
+          console.log('Warning: line column not found in the CSV. Available columns:');
+          console.log(allColumns.join(', '));
+          
+          // Log potential spread-related columns for reference
+          const potentialSpreadColumns = allColumns.filter(col => 
+            col.toLowerCase().includes('spread') || 
+            col.toLowerCase().includes('line') || 
+            col.toLowerCase().includes('handicap')
+          );
+          
+          if (potentialSpreadColumns.length > 0) {
+            console.log('Potential spread-related columns found:');
+            potentialSpreadColumns.forEach(col => console.log(`- ${col}`));
+          }
+          
+          return resolve();
+        }
+        
+        console.log(`Will invert the line column values`);
+        
+        // Fix spread directions by inverting the values for the line column
+        let updatedCount = 0;
+        results.forEach(row => {
+          if (row.line && !isNaN(parseFloat(row.line))) {
+            // Invert the spread value to fix direction
+            row.line = (-1 * parseFloat(row.line)).toString();
+            updatedCount++;
+          }
+        });
+
+        // Write back to CSV
+        const headers = Object.keys(results[0]);
+        const csvContent = [
+          headers.join(','),
+          ...results.map(row => headers.map(header => row[header]).join(','))
+        ].join('\n');
+
+        fs.writeFileSync(filePath, csvContent);
+        console.log(`Fixed spread directions in ${filePath} for line column. Updated ${updatedCount} values.`);
+        
+        resolve();
+      })
+      .on('error', reject);
+  });
 }
 
 /**
@@ -118,6 +195,9 @@ async function downloadEvanMiyaData() {
     // Save the file to the specified output path
     await download.saveAs(config.outputFile);
     console.log(`File downloaded successfully to: ${config.outputFile}`);
+    
+    // Process the CSV to fix spread directions
+    await processSpreadDirections(config.outputFile);
     
     return {
       success: true,
