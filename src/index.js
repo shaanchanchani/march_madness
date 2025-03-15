@@ -178,36 +178,43 @@ async function joinDatasets() {
       }
     });
     
-    // First perform inner join between KenPom and EvanMiya
-    const innerJoinResult = [];
+    // First perform left join between KenPom and EvanMiya
+    const leftJoinResult = [];
+    
+    // Get all possible EM columns by looking at first record (or any record)
+    const emColumns = emData.length > 0 ? 
+      Object.keys(emData[0]).filter(key => !['Team', 'Home Team', 'Away Team'].includes(key)) : 
+      [];
     
     for (const kpItem of kpData) {
-      // Create the same composite key for matching
       const compositeKey = `${kpItem['Team']}_${kpItem['Home Team']}_${kpItem['Away Team']}`;
       const emItem = emLookup.get(compositeKey);
       
-      if (emItem) {
-        // Start with KenPom data
-        const combinedItem = { ...kpItem };
-        
-        // Add non-duplicate fields from EvanMiya
-        for (const [key, value] of Object.entries(emItem)) {
-          if (!['Team', 'Home Team', 'Away Team'].includes(key) || !combinedItem[key]) {
-            combinedItem[key] = value;
-          }
-        }
-        
-        innerJoinResult.push(combinedItem);
+      // Start with KP data
+      const combinedItem = { ...kpItem };
+      
+      // Initialize all EM columns as null
+      emColumns.forEach(col => {
+        combinedItem[col] = null;
+      });
+      
+      // Add EM data if it exists
+      if (emItem) {   
+        emColumns.forEach(col => {
+          combinedItem[col] = emItem[col];
+        });
       }
+      
+      leftJoinResult.push(combinedItem);
     }
     
-    console.log(`Inner join produced ${innerJoinResult.length} records`);
+    console.log(`Left join produced ${leftJoinResult.length} records`);
     
     // Now perform left join with Barttorvik data
     const afterBtResult = [];
     let barttorvikMatches = 0;
     
-    for (const item of innerJoinResult) {
+    for (const item of leftJoinResult) {
       // Try different matching strategies
       const fullBtKey = `${item['Team']}_${item['Home Team'] || ''}_${item['Away Team'] || ''}`;
       const simpleBtKey = item['Team'];
