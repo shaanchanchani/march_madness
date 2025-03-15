@@ -152,30 +152,20 @@ async function joinDatasets() {
       emLookup.set(key, item);
     });
     
-    // Create Barttorvik lookup with team as key
+    // Create Barttorvik lookup
     const btLookup = new Map();
     btData.forEach(item => {
-      // Use composite key for more accurate matching
+      // Only use composite key, remove team-only fallback
       const key = `${item['Team']}_${item['Home Team']}_${item['Away Team']}`;
-      // Also add a team-only key as fallback
       btLookup.set(key, item);
-      // Only add team-only key if it doesn't exist yet (preference for first occurrence)
-      if (!btLookup.has(item['Team'])) {
-        btLookup.set(item['Team'], item);
-      }
     });
     
-    // Create Hasla lookup with team as key
+    // Create Hasla lookup
     const haslaLookup = new Map();
     haslaData.forEach(item => {
-      // Use composite key for more accurate matching
+      // Only use composite key, remove team-only fallback
       const key = `${item['Team']}_${item['Home Team']}_${item['Away Team']}`;
-      // Also add a team-only key as fallback
       haslaLookup.set(key, item);
-      // Only add team-only key if it doesn't exist yet (preference for first occurrence)
-      if (!haslaLookup.has(item['Team'])) {
-        haslaLookup.set(item['Team'], item);
-      }
     });
     
     // First perform left join between KenPom and EvanMiya
@@ -215,14 +205,16 @@ async function joinDatasets() {
     let barttorvikMatches = 0;
     
     for (const item of leftJoinResult) {
-      // Try different matching strategies
-      const fullBtKey = `${item['Team']}_${item['Home Team'] || ''}_${item['Away Team'] || ''}`;
-      const simpleBtKey = item['Team'];
+      const fullBtKey = `${item['Team']}_${item['Home Team']}_${item['Away Team']}`;
+      const btItem = btLookup.get(fullBtKey);
       
-      // Try full key first, then fall back to simple key
-      const btItem = btLookup.get(fullBtKey) || btLookup.get(simpleBtKey);
-      
-      const newItem = { ...item };
+      // Always include original item and initialize Barttorvik fields as null
+      const newItem = {
+        ...item,
+        spread_barttorvik: null,
+        win_prob_barttorvik: null,
+        projected_total_barttorvik: null
+      };
       
       if (btItem) {
         barttorvikMatches++;
@@ -242,26 +234,26 @@ async function joinDatasets() {
     let haslaMatches = 0;
     
     for (const item of afterBtResult) {
-      // Try different matching strategies
-      const fullHaslaKey = `${item['Team']}_${item['Home Team'] || ''}_${item['Away Team'] || ''}`;
-      const simpleHaslaKey = item['Team'];
+      const fullHaslaKey = `${item['Team']}_${item['Home Team']}_${item['Away Team']}`;
+      const haslaItem = haslaLookup.get(fullHaslaKey);
       
-      // Try full key first, then fall back to simple key
-      const haslaItem = haslaLookup.get(fullHaslaKey) || haslaLookup.get(simpleHaslaKey);
+      // Always include original item and initialize Hasla fields as null
+      const newItem = {
+        ...item,
+        spread_hasla: null,
+        win_prob_hasla: null,
+        projected_total_hasla: null
+      };
       
       if (haslaItem) {
         haslaMatches++;
         // Add Hasla-specific fields
-        finalResult.push({
-          ...item,
-          spread_hasla: haslaItem.spread_hasla,
-          win_prob_hasla: haslaItem.win_prob_hasla,
-          projected_total_hasla: haslaItem.projected_total_hasla
-        });
-      } else {
-        // No Hasla match, just include the original item
-        finalResult.push(item);
+        newItem.spread_hasla = haslaItem.spread_hasla;
+        newItem.win_prob_hasla = haslaItem.win_prob_hasla;
+        newItem.projected_total_hasla = haslaItem.projected_total_hasla;
       }
+      
+      finalResult.push(newItem);
     }
     
     console.log(`Left join with Hasla produced ${finalResult.length} records with ${haslaMatches} Hasla matches`);
