@@ -21,8 +21,6 @@ const CONFIG = {
   csvOutputPath: path.join(__dirname, '../../data/kp.csv'), // Fixed output path for the CSV
   headless: true, // Run in headless mode (no browser UI)
   navigationTimeout: 30000, // Navigation timeout in ms (30 seconds)
-  // Target date to scrape through (YYYY-MM-DD format)
-  targetDate: '2025-03-24',
   // Load credentials from environment variables
   credentials: {
     email: process.env.EMAIL || '',
@@ -468,18 +466,10 @@ async function runScraper() {
       
       // Check if we've reached the limit (only one day link - the previous day)
       if (dayLinks.length === 1) {
-        console.log('Only one day link found on the page');
+        console.log('Only one day link found on the page, reached most recent day');
         
-        // Check if we've reached or passed our target date
-        const targetDate = new Date(CONFIG.targetDate);
-        const currentDate = new Date(currentDateInfo.dateString || new Date().toISOString().split('T')[0]);
-        
-        if (currentDate >= targetDate) {
-          console.log(`Reached or passed target date (${CONFIG.targetDate}). Stopping navigation.`);
-          canContinue = false;
-        } else {
-          console.log(`Haven't reached target date yet (${CONFIG.targetDate}), will keep checking for new days`);
-          
+        // Check if we should wait for new days or exit
+        if (CONFIG.waitForNewDays) {
           if (!reachedLatestDay) {
             console.log('Will check periodically for new days');
             reachedLatestDay = true;
@@ -497,9 +487,12 @@ async function runScraper() {
             // Save HTML after refresh
             await saveHTMLToFile(page, `fanmatch-refresh-${checkCount}.html`);
           } else {
-            console.log(`Reached maximum number of checks (${CONFIG.maxChecks}). Target date not found.`);
+            console.log(`Reached maximum number of checks (${CONFIG.maxChecks}). No new days found.`);
             canContinue = false;
           }
+        } else {
+          console.log('Exit condition met (only one day link). Stopping navigation.');
+          canContinue = false;
         }
         
         // Skip the rest of the loop
