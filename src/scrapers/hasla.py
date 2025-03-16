@@ -371,8 +371,19 @@ if __name__ == "__main__":
     df = scrape_hasla()
     
     if df.empty:
-        print("[red]✗[/red] Failed to scrape Hasla data")
-        sys.exit(1)
+        print("[yellow]⚠[/yellow] No games found in Hasla scraper")
+        # Create empty DataFrame with correct columns
+        df = pd.DataFrame(columns=[
+            'Home Team', 'Away Team', 'Team', 'Game Date',
+            'spread_hasla', 'win_prob_hasla', 'projected_total_hasla'
+        ])
+        # Save empty DataFrame
+        output_file = os.path.join(data_dir, 'hasla_mapped.csv')
+        df.to_csv(output_file, index=False)
+        print(f"[green]✓[/green] Saved empty Hasla data to: {output_file}")
+        print(f"Final dataframe shape: {df.shape}")
+        print("=== Hasla scraper completed with empty dataset ===")
+        sys.exit(0)  # Exit with success code
         
     # Clean and transform data
     print("\n[cyan]Mapping team names...[/cyan]")
