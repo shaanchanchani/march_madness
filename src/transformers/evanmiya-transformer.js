@@ -44,32 +44,57 @@ async function transformEvanMiyaData() {
         const awayTeam = row.away;
         const gameDate = row.Date || new Date().toISOString().split('T')[0];
 
-        // Home team perspective
+        // Try both team orderings and use the one that matches the line
+        const line = parseFloat(row.line);
+        const isHomeTeamFavored = line < 0;
+
+        // Create records with original team ordering
         const homeRow = {
           'Home Team': homeTeam,
           'Away Team': awayTeam,
           'Team': homeTeam,
           'Game Date': gameDate,
-          'spread_evanmiya': -parseFloat(row.line), // Flip the sign for home team
+          'spread_evanmiya': -line, // Flip the sign for home team
           'win_prob_evanmiya': parseFloat(row.home_win_prob),
           'projected_total_evanmiya': parseFloat(row.ou)
         };
-        transformedData.push(homeRow);
 
-        // Away team perspective
         const awayRow = {
           'Home Team': homeTeam,
           'Away Team': awayTeam,
           'Team': awayTeam,
           'Game Date': gameDate,
-          'spread_evanmiya': parseFloat(row.line), // Use line value directly
+          'spread_evanmiya': line,
           'win_prob_evanmiya': parseFloat(row.away_win_prob),
           'projected_total_evanmiya': parseFloat(row.ou)
         };
-        transformedData.push(awayRow);
+
+        // Create records with swapped team ordering
+        const swappedHomeRow = {
+          'Home Team': awayTeam,
+          'Away Team': homeTeam,
+          'Team': awayTeam,
+          'Game Date': gameDate,
+          'spread_evanmiya': line,
+          'win_prob_evanmiya': parseFloat(row.away_win_prob),
+          'projected_total_evanmiya': parseFloat(row.ou)
+        };
+
+        const swappedAwayRow = {
+          'Home Team': awayTeam,
+          'Away Team': homeTeam,
+          'Team': homeTeam,
+          'Game Date': gameDate,
+          'spread_evanmiya': -line,
+          'win_prob_evanmiya': parseFloat(row.home_win_prob),
+          'projected_total_evanmiya': parseFloat(row.ou)
+        };
+
+        // Add both versions to allow for flexible matching
+        transformedData.push(homeRow, awayRow, swappedHomeRow, swappedAwayRow);
       })
       .on('end', async () => {
-        console.log(`Read ${transformedData.length / 2} games (${transformedData.length} rows)`);
+        console.log(`Read ${transformedData.length / 4} games (${transformedData.length} rows)`);
 
         // Create CSV writer with the appropriate headers
         const csvWriter = createObjectCsvWriter({
@@ -100,7 +125,7 @@ async function transformEvanMiyaData() {
           resolve({
             success: true,
             inputFile: config.inputFile,
-            gameCount: transformedData.length / 2,
+            gameCount: transformedData.length / 4,
             rowCount: transformedData.length
           });
         } catch (error) {

@@ -347,13 +347,23 @@ def transform_barttorvik_data(df):
             # Set spread to 0 if missing
             spread = 0 if pd.isna(spread) else float(spread)
 
-            # Determine favored team
+            # Try both team orderings
+            # First try original ordering
             is_home_favored = team_name == row['Home Team']
             is_away_favored = team_name == row['Away Team']
 
             if not (is_home_favored or is_away_favored):
-                failed_rows.append(f"Row {idx}: '{line_data}' - Could not match team name '{team_name}' to either home or away team")
-                continue
+                # Try swapped ordering
+                is_home_favored = team_name == row['Away Team']
+                is_away_favored = team_name == row['Home Team']
+                if is_home_favored or is_away_favored:
+                    # Swap teams and adjust spread/probability
+                    row['Home Team'], row['Away Team'] = row['Away Team'], row['Home Team']
+                    spread = -spread
+                    win_prob = 100 - float(win_prob)
+                else:
+                    failed_rows.append(f"Row {idx}: '{line_data}' - Could not match team name '{team_name}' to either home or away team")
+                    continue
 
             # Home team record
             home_rows.append({

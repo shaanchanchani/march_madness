@@ -259,7 +259,7 @@ def scrape_hasla():
             
             games_table.add_row("", matchup, spread_str, total_str)
 
-            # Add rows for DataFrame - home team first
+            # Add rows for DataFrame - original ordering
             rows.append({
                 'Home Team': teamA_name,
                 'Away Team': teamB_name,
@@ -270,7 +270,6 @@ def scrape_hasla():
                 'projected_total_hasla': total
             })
 
-            # Away team record
             rows.append({
                 'Home Team': teamA_name,
                 'Away Team': teamB_name,
@@ -280,6 +279,28 @@ def scrape_hasla():
                 'win_prob_hasla': None,  # Hasla doesn't provide win probability
                 'projected_total_hasla': total
             })
+
+            # Add rows for DataFrame - swapped ordering
+            rows.append({
+                'Home Team': teamB_name,
+                'Away Team': teamA_name,
+                'Team': teamB_name,
+                'Game Date': game_date,
+                'spread_hasla': -spread if spread is not None else None,
+                'win_prob_hasla': None,  # Hasla doesn't provide win probability
+                'projected_total_hasla': total
+            })
+
+            rows.append({
+                'Home Team': teamB_name,
+                'Away Team': teamA_name,
+                'Team': teamA_name,
+                'Game Date': game_date,
+                'spread_hasla': spread if spread is not None else None,
+                'win_prob_hasla': None,  # Hasla doesn't provide win probability
+                'projected_total_hasla': total
+            })
+
             game_count += 1
 
         console.print(games_table)

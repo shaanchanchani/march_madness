@@ -146,26 +146,62 @@ async function joinDatasets() {
     // Create lookup objects for faster joins
     // Use Map instead of plain objects for better performance with larger datasets
     const emLookup = new Map();
+    const emSwappedLookup = new Map();
     emData.forEach(item => {
-      // Use composite key with Team, Home Team, and Away Team (no fallback)
+      // Original ordering
       const key = `${item['Team']}_${item['Home Team']}_${item['Away Team']}`;
       emLookup.set(key, item);
+      
+      // Swapped ordering
+      const swappedKey = `${item['Team']}_${item['Away Team']}_${item['Home Team']}`;
+      const swappedItem = {
+        ...item,
+        'Home Team': item['Away Team'],
+        'Away Team': item['Home Team'],
+        'spread_evanmiya': item['spread_evanmiya'] ? -item['spread_evanmiya'] : null,
+        'win_prob_evanmiya': item['win_prob_evanmiya'] ? 1 - item['win_prob_evanmiya'] : null
+      };
+      emSwappedLookup.set(swappedKey, swappedItem);
     });
     
-    // Create Barttorvik lookup
+    // Create Barttorvik lookup with both orderings
     const btLookup = new Map();
+    const btSwappedLookup = new Map();
     btData.forEach(item => {
-      // Only use composite key, remove team-only fallback
+      // Original ordering
       const key = `${item['Team']}_${item['Home Team']}_${item['Away Team']}`;
       btLookup.set(key, item);
+      
+      // Swapped ordering
+      const swappedKey = `${item['Team']}_${item['Away Team']}_${item['Home Team']}`;
+      const swappedItem = {
+        ...item,
+        'Home Team': item['Away Team'],
+        'Away Team': item['Home Team'],
+        'spread_barttorvik': item['spread_barttorvik'] ? -item['spread_barttorvik'] : null,
+        'win_prob_barttorvik': item['win_prob_barttorvik'] ? 1 - item['win_prob_barttorvik'] : null
+      };
+      btSwappedLookup.set(swappedKey, swappedItem);
     });
     
-    // Create Hasla lookup
+    // Create Hasla lookup with both orderings
     const haslaLookup = new Map();
+    const haslaSwappedLookup = new Map();
     haslaData.forEach(item => {
-      // Only use composite key, remove team-only fallback
+      // Original ordering
       const key = `${item['Team']}_${item['Home Team']}_${item['Away Team']}`;
       haslaLookup.set(key, item);
+      
+      // Swapped ordering
+      const swappedKey = `${item['Team']}_${item['Away Team']}_${item['Home Team']}`;
+      const swappedItem = {
+        ...item,
+        'Home Team': item['Away Team'],
+        'Away Team': item['Home Team'],
+        'spread_hasla': item['spread_hasla'] ? -item['spread_hasla'] : null,
+        'win_prob_hasla': item['win_prob_hasla'] ? 1 - item['win_prob_hasla'] : null
+      };
+      haslaSwappedLookup.set(swappedKey, swappedItem);
     });
     
     // First perform left join between KenPom and EvanMiya
@@ -178,7 +214,10 @@ async function joinDatasets() {
     
     for (const kpItem of kpData) {
       const compositeKey = `${kpItem['Team']}_${kpItem['Home Team']}_${kpItem['Away Team']}`;
-      const emItem = emLookup.get(compositeKey);
+      const swappedKey = `${kpItem['Team']}_${kpItem['Away Team']}_${kpItem['Home Team']}`;
+      
+      // Try both orderings
+      const emItem = emLookup.get(compositeKey) || emSwappedLookup.get(swappedKey);
       
       // Start with KP data
       const combinedItem = { ...kpItem };
@@ -206,7 +245,10 @@ async function joinDatasets() {
     
     for (const item of leftJoinResult) {
       const fullBtKey = `${item['Team']}_${item['Home Team']}_${item['Away Team']}`;
-      const btItem = btLookup.get(fullBtKey);
+      const swappedBtKey = `${item['Team']}_${item['Away Team']}_${item['Home Team']}`;
+      
+      // Try both orderings
+      const btItem = btLookup.get(fullBtKey) || btSwappedLookup.get(swappedBtKey);
       
       // Always include original item and initialize Barttorvik fields as null
       const newItem = {
@@ -235,7 +277,10 @@ async function joinDatasets() {
     
     for (const item of afterBtResult) {
       const fullHaslaKey = `${item['Team']}_${item['Home Team']}_${item['Away Team']}`;
-      const haslaItem = haslaLookup.get(fullHaslaKey);
+      const swappedHaslaKey = `${item['Team']}_${item['Away Team']}_${item['Home Team']}`;
+      
+      // Try both orderings
+      const haslaItem = haslaLookup.get(fullHaslaKey) || haslaSwappedLookup.get(swappedHaslaKey);
       
       // Always include original item and initialize Hasla fields as null
       const newItem = {
@@ -261,14 +306,15 @@ async function joinDatasets() {
     // Determine the header fields from the data
     const headers = Object.keys(finalResult[0] || {}).map(id => ({id, title: id}));
     
-    // Write the joined data to a new CSV file
+    // Create CSV writer with the appropriate headers
     const csvWriter = createObjectCsvWriter({
       path: path.join(dataDir, 'combined_data.csv'),
       header: headers
     });
-    
+
+    // Write the final result to CSV
     await csvWriter.writeRecords(finalResult);
-    console.log(`Joined data written to ${path.join(dataDir, 'combined_data.csv')}`);
+    console.log(`Successfully wrote ${finalResult.length} records to combined_data.csv`);
     
   } catch (error) {
     console.error('Error joining datasets:', error);

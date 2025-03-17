@@ -422,7 +422,8 @@ def transform_to_kenpom_format(games):
                 print(f"Warning: Skipping game with missing team info - Home: {game['home_team']}, Away: {game['away_team']}")
                 continue
             
-            # Create home team row
+            # Try both team orderings
+            # Original ordering
             home_row = {
                 'Home Team': game['home_team'],
                 'Away Team': game['away_team'],
@@ -433,7 +434,6 @@ def transform_to_kenpom_format(games):
                 'projected_total_kenpom': game['total']
             }
             
-            # Create away team row
             away_row = {
                 'Home Team': game['home_team'],
                 'Away Team': game['away_team'],
@@ -444,7 +444,29 @@ def transform_to_kenpom_format(games):
                 'projected_total_kenpom': game['total']
             }
             
-            transformed_rows.extend([home_row, away_row])
+            # Swapped ordering
+            swapped_home_row = {
+                'Home Team': game['away_team'],
+                'Away Team': game['home_team'],
+                'Team': game['away_team'],
+                'Game Date': game_date,
+                'spread_kenpom': game['away_spread'],
+                'win_prob_kenpom': game['away_win_probability'],
+                'projected_total_kenpom': game['total']
+            }
+            
+            swapped_away_row = {
+                'Home Team': game['away_team'],
+                'Away Team': game['home_team'],
+                'Team': game['home_team'],
+                'Game Date': game_date,
+                'spread_kenpom': game['home_spread'],
+                'win_prob_kenpom': game['home_win_probability'],
+                'projected_total_kenpom': game['total']
+            }
+            
+            # Add both versions to allow for flexible matching
+            transformed_rows.extend([home_row, away_row, swapped_home_row, swapped_away_row])
         except Exception as e:
             print(f"Error transforming game: {e}")
             if 'match_date' in game and 'home_team' in game and 'away_team' in game:

@@ -529,7 +529,8 @@ def get_combined_odds():
 
 def merge_with_combined_data(odds_df):
     """
-    Merges odds data with the combined data from previous steps
+    Merges odds data with the combined data from previous steps.
+    Tries both home/away team orderings to maximize matches.
     """
     logger.info("[cyan]Loading combined data from CSV...[/cyan]")
     combined_data_path = os.path.join(data_dir, 'combined_data.csv')
@@ -542,31 +543,54 @@ def merge_with_combined_data(odds_df):
     combined_df = pd.read_csv(combined_data_path)
     logger.info(f"[green]✓[/green] Loaded combined data with shape: {combined_df.shape}")
     
-    # Preview combined data
+    # Preview data
     logger.info("\n[cyan]Preview of combined_data.csv:[/cyan]")
     logger.info(f"Columns: {', '.join(combined_df.columns[:10])}")
     logger.info(f"First few teams: {combined_df['Team'].head().tolist()}")
     
-    # Preview odds data
     logger.info("\n[cyan]Preview of odds data:[/cyan]")
     logger.info(f"Columns: {', '.join(odds_df.columns)}")
     logger.info(f"First few teams: {odds_df['Team'].head().tolist()}")
     
-    # Create a team name mapping table if needed
-    # For now, let's assume the team names are already aligned
-    
-    # Merge data on Team, Home Team, and Away Team
-    logger.info("[cyan]Merging combined data with odds data...[/cyan]")
+    # Try original team ordering
+    logger.info("[cyan]Attempting merge with original team ordering...[/cyan]")
     result_df = pd.merge(
         combined_df,
         odds_df,
         on=['Team', 'Home Team', 'Away Team'],
         how='left'
     )
+    original_matches = result_df['Moneyline'].notna().sum()
+    logger.info(f"Original ordering matches: {original_matches}")
+    
+    # Create swapped version of odds data
+    logger.info("[cyan]Creating swapped team version...[/cyan]")
+    swapped_odds_df = odds_df.copy()
+    swapped_odds_df['Home Team'], swapped_odds_df['Away Team'] = odds_df['Away Team'], odds_df['Home Team']
+    # Adjust spreads and probabilities for the swap
+    swapped_odds_df['Opening Spread'] = -swapped_odds_df['Opening Spread']
+    if 'Devigged Probability' in swapped_odds_df.columns:
+        swapped_odds_df['Devigged Probability'] = 1 - swapped_odds_df['Devigged Probability']
+    
+    # Try merge with swapped teams
+    logger.info("[cyan]Attempting merge with swapped team ordering...[/cyan]")
+    swapped_result_df = pd.merge(
+        combined_df,
+        swapped_odds_df,
+        on=['Team', 'Home Team', 'Away Team'],
+        how='left'
+    )
+    swapped_matches = swapped_result_df['Moneyline'].notna().sum()
+    logger.info(f"Swapped ordering matches: {swapped_matches}")
+    
+    # Use whichever version got more matches
+    if swapped_matches > original_matches:
+        logger.info("[green]✓[/green] Using swapped team ordering (more matches)")
+        result_df = swapped_result_df
+    else:
+        logger.info("[green]✓[/green] Using original team ordering (more matches)")
     
     logger.info(f"[green]✓[/green] Merged data has shape: {result_df.shape}")
-    
-    # Check for merge results
     merge_success_count = result_df['Moneyline'].notna().sum()
     logger.info(f"[cyan]Successfully matched odds for {merge_success_count} / {len(result_df)} rows[/cyan]")
     
