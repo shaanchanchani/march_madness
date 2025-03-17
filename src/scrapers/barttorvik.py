@@ -134,7 +134,7 @@ def fetch_multiple_days(start_date=None, num_days=5):
     print(f"Fetched data for {days_fetched} days")
     return all_games
 
-def get_barttorvik_df(days_ahead=5):
+def get_barttorvik_df(days_ahead=10):
     """
     Main function to get processed Barttorvik data for multiple days
     
@@ -428,7 +428,7 @@ def map_team_names(df, name_map):
 
 if __name__ == "__main__":
     # Run the script to get data for the next 5 days
-    df = get_barttorvik_df(days_ahead=5)
+    df = get_barttorvik_df(days_ahead=10)
     
     # Save the output to a single CSV file
     output_file = os.path.join(data_dir, 'bt_mapped.csv')
